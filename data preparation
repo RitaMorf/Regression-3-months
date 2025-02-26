@@ -1,0 +1,95 @@
+###############Regression 3 months###########################
+# Loading the package
+library(dplyr)
+
+# Manual assignment of column names
+colnames(data) <- c("study_id","redcap_event_name","redcap_repeat_instrument","redcap_repeat_instance","paindetect1","paindetect2","paindetect3","ndi1","ndi2","ndi3","ndi4","ndi5","ndi6",
+                    "ndi7","ndi8","ndi9","ndi10","ndiscore","cortisol1","cortisone1","score_stress_skala_1",
+                    "score_stress_skala_2","score_stress_skala_3","gesamtscore_symptom","sci_stress1_1","sci_stress1_2",
+                    "sci_stress1_3","sci_stress1_4","sci_stress1_5","sci_stress1_6","sci_stress1_7","sci_stress2_1",
+                    "sci_stress2_2","sci_stress2_3","sci_stress2_4","sci_stress2_5","sci_stress2_6","sci_stress3_1",
+                    "sci_stress3_2","sci_stress3_3","sci_stress3_4","sci_stress3_5","sci_stress3_6","sci_stress3_7",
+                    "sci_symtpom1","sci_symtpom2","sci_symtpom3","sci_symtpom4","sci_symtpom5","sci_symtpom6",
+                    "sci_symtpom7","sci_symtpom8","sci_symtpom9","sci_symtpom10","sci_symtpom11","sci_symtpom12",
+                    "sci_symtpom13","pps1_light","pps2_light","pps3_light","pps4_light","pps5_light","pps6_light",
+                    "pps7_light","pps1_strong","pps2_strong","pps3_strong","pps4_strong","pps5_strong","pps6_strong",
+                    "pps7_strong","aefs_dms1","aefs_dms2","score_pps","dms_score","dass21_depression")
+
+# Delete the first line
+data <- data [-1, ]
+
+# Define columns in which empty positions are to be replaced with NA
+columns_to_fill <- c("paindetect1","paindetect2","paindetect3","ndi1","ndi2","ndi3","ndi4","ndi5","ndi6",
+                     "ndi7","ndi8","ndi9","ndi10","ndiscore","cortisol1","cortisone1","score_stress_skala_1",
+                     "score_stress_skala_2","score_stress_skala_3","gesamtscore_symptom","sci_stress1_1","sci_stress1_2",
+                     "sci_stress1_3","sci_stress1_4","sci_stress1_5","sci_stress1_6","sci_stress1_7","sci_stress2_1",
+                     "sci_stress2_2","sci_stress2_3","sci_stress2_4","sci_stress2_5","sci_stress2_6","sci_stress3_1",
+                     "sci_stress3_2","sci_stress3_3","sci_stress3_4","sci_stress3_5","sci_stress3_6","sci_stress3_7",
+                     "sci_symtpom1","sci_symtpom2","sci_symtpom3","sci_symtpom4","sci_symtpom5","sci_symtpom6",
+                     "sci_symtpom7","sci_symtpom8","sci_symtpom9","sci_symtpom10","sci_symtpom11","sci_symtpom12",
+                     "sci_symtpom13","pps1_light","pps2_light","pps3_light","pps4_light","pps5_light","pps6_light",
+                     "pps7_light","pps1_strong","pps2_strong","pps3_strong","pps4_strong","pps5_strong","pps6_strong",
+                     "pps7_strong","aefs_dms1","aefs_dms2","score_pps","dms_score","dass21_depression")
+
+# Replace empty positions (represented as empty strings or explicit NAs) in these columns with NA
+data[columns_to_fill] <- lapply(data [columns_to_fill], function(x) {
+  x[x == "" | is.na(x)] <- NA
+  return(x)
+})
+
+
+#Filtering of rows from different measurements (questionnaires or clinical measurements)
+data_depression <- data %>% 
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%  # Selection of the T1 questionnaire data
+  select(study_id, dass21_depression)  # Selection of the relevant variables (ID + depression)
+
+data_cortisol <- data %>%
+  filter(redcap_event_name == "untersuchung_t1_arm_1") %>%
+  select(study_id, cortisol1)
+
+data_pain_acute <- data %>%
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%
+  select(study_id, paindetect1,paindetect2,paindetect3)
+
+data_pain_3months <- data %>%
+  filter(redcap_event_name == "fragebogen_t2_arm_1") %>%
+  select(study_id, paindetect1,paindetect2,paindetect3)
+
+data_disability <- data %>%
+  filter(redcap_event_name == "fragebogen_t2_arm_1") %>%
+  select(study_id, ndiscore)
+
+data_activity_patterns <- data %>%
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%
+  select(study_id, score_pps,dms_score)
+
+data_stress <- data %>%
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%
+  select(study_id, score_stress_skala_1,score_stress_skala_2,score_stress_skala_3,gesamtscore_symptom)
+
+
+#Data cleaning and preparing
+#deleting Cortisol and Cortisone data which is over 95th percentile
+
+# Check the data type
+str(data$study_id)
+
+# Ensure that the study_id is available as a numerical value
+data$study_id <- as.numeric(as.character(data$study_id))
+
+# List of known outlier IDs
+outlier_ids <- c(120, 174, 200, 307, 322, 324, 371, 384, 618, 644)
+
+# Remove the outliers ONLY for the cortisol measurements
+data_no_cortisol_outliers <- data %>%
+  filter(!(study_id %in% outlier_ids & redcap_event_name == "untersuchung_t1_arm_1"))
+
+# Check whether cortisol outliers have been removed
+cortisol_outliers_left <- data_no_cortisol_outliers %>%
+  filter(study_id %in% outlier_ids & redcap_event_name == "untersuchung_t1_arm_1")
+print(cortisol_outliers_left)  # Sollte leer sein, wenn die Entfernung funktioniert hat
+
+# Check whether questionnaire data has been preserved
+questionnaire_data <- data_no_cortisol_outliers %>%
+  filter(study_id %in% outlier_ids & redcap_event_name != "untersuchung_t1_arm_1")
+print(questionnaire_data)  # Sollte Daten enthalten, wenn alles korrekt ist
