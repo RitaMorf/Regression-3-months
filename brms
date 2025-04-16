@@ -1,0 +1,678 @@
+
+
+###############Regression 3 months###########################
+
+# Loading the packages
+install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("lme4")
+install.packages("GGally") 
+install.packages("car")
+install.packages("performance")
+install.packages("Matrix")
+install.packages("generics")
+install.packages("tidyselect")
+install.packages("brms") 
+install.packages("sjPlot")
+install.packages ("Rcpp")
+install.packages ("rstudioapi")
+ 
+
+
+library(dplyr)
+library(ggplot2)
+library(lme4)
+library(GGally)
+library(car)
+library(performance)
+library(Matrix)
+library(generics)
+library(tidyselect)
+library(brms)
+library(sjPlot)
+library(Rcpp)
+library(rstudioapi)
+
+
+# Manual assignment of column names
+colnames(data) <- c("study_id","redcap_event_name","redcap_repeat_instrument","redcap_repeat_instance","paindetect1","paindetect2","paindetect3","ndi1","ndi2","ndi3","ndi4","ndi5","ndi6",
+                    "ndi7","ndi8","ndi9","ndi10","ndiscore","cortisol1","cortisone1","score_stress_skala_1",
+                    "score_stress_skala_2","score_stress_skala_3","gesamtscore_symptom","sci_stress1_1","sci_stress1_2",
+                    "sci_stress1_3","sci_stress1_4","sci_stress1_5","sci_stress1_6","sci_stress1_7","sci_stress2_1",
+                    "sci_stress2_2","sci_stress2_3","sci_stress2_4","sci_stress2_5","sci_stress2_6","sci_stress3_1",
+                    "sci_stress3_2","sci_stress3_3","sci_stress3_4","sci_stress3_5","sci_stress3_6","sci_stress3_7",
+                    "sci_symtpom1","sci_symtpom2","sci_symtpom3","sci_symtpom4","sci_symtpom5","sci_symtpom6",
+                    "sci_symtpom7","sci_symtpom8","sci_symtpom9","sci_symtpom10","sci_symtpom11","sci_symtpom12",
+                    "sci_symtpom13","pps1_light","pps2_light","pps3_light","pps4_light","pps5_light","pps6_light",
+                    "pps7_light","pps1_strong","pps2_strong","pps3_strong","pps4_strong","pps5_strong","pps6_strong",
+                    "pps7_strong","aefs_dms1","aefs_dms2","score_pps","dms_score","dass21_depression","age", "gender")
+
+# Delete the first line
+data <- data [-1, ]
+
+# Define columns in which empty positions are to be replaced with NA
+columns_to_fill <- c("paindetect1","paindetect2","paindetect3","ndi1","ndi2","ndi3","ndi4","ndi5","ndi6",
+                     "ndi7","ndi8","ndi9","ndi10","ndiscore","cortisol1","cortisone1","score_stress_skala_1",
+                     "score_stress_skala_2","score_stress_skala_3","gesamtscore_symptom","sci_stress1_1","sci_stress1_2",
+                     "sci_stress1_3","sci_stress1_4","sci_stress1_5","sci_stress1_6","sci_stress1_7","sci_stress2_1",
+                     "sci_stress2_2","sci_stress2_3","sci_stress2_4","sci_stress2_5","sci_stress2_6","sci_stress3_1",
+                     "sci_stress3_2","sci_stress3_3","sci_stress3_4","sci_stress3_5","sci_stress3_6","sci_stress3_7",
+                     "sci_symtpom1","sci_symtpom2","sci_symtpom3","sci_symtpom4","sci_symtpom5","sci_symtpom6",
+                     "sci_symtpom7","sci_symtpom8","sci_symtpom9","sci_symtpom10","sci_symtpom11","sci_symtpom12",
+                     "sci_symtpom13","pps1_light","pps2_light","pps3_light","pps4_light","pps5_light","pps6_light",
+                     "pps7_light","pps1_strong","pps2_strong","pps3_strong","pps4_strong","pps5_strong","pps6_strong",
+                     "pps7_strong","aefs_dms1","aefs_dms2","score_pps","dms_score","dass21_depression", "age","gender")
+
+# Replace empty positions (represented as empty strings or explicit NAs) in these columns with NA
+data[columns_to_fill] <- lapply(data [columns_to_fill], function(x) {
+  x[x == "" | is.na(x)] <- NA
+  return(x)
+})
+
+
+#Filtering of rows from different measurements (questionnaires or clinical measurements)
+data_depression <- data %>% 
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%  # Selection of the T1 questionnaire data
+  dplyr::select(study_id, dass21_depression)  # Selection of the relevant variables (ID + depression)
+
+data_cortisol <- data %>%
+  filter(redcap_event_name == "untersuchung_t1_arm_1") %>%
+  dplyr::select(study_id, cortisol1)
+
+data_pain_acute <- data %>%
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%
+  dplyr::select(study_id, paindetect1,paindetect2,paindetect3)
+
+data_pain_3months <- data %>%
+  filter(redcap_event_name == "fragebogen_t2_arm_1") %>%
+  dplyr::select(study_id, paindetect1,paindetect2,paindetect3)
+
+data_disability <- data %>%
+  filter(redcap_event_name == "fragebogen_t2_arm_1") %>%
+  dplyr::select(study_id, ndiscore)
+
+data_age <- data %>%
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%
+  dplyr::select(study_id, age)
+
+data_gender <- data %>%
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%
+  dplyr::select(study_id, gender)
+
+data_activity_patterns <- data %>%
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%
+  dplyr::select(study_id, score_pps,dms_score)
+
+data_stress <- data %>%
+  filter(redcap_event_name == "fragebogen_t1_arm_1") %>%
+  dplyr::select(study_id, score_stress_skala_1,score_stress_skala_2,score_stress_skala_3,gesamtscore_symptom)
+
+######################Umcodierungen für Schmerzdurchschnittswert
+# Überprüfung der Datentypen
+str(data$paindetect1)
+str(data$paindetect2)
+str(data$paindetect3)
+
+# Nicht-numerische Werte (wie "NA" als Text) in echte NA umwandeln
+data <- data %>%
+  mutate(across(c(paindetect1, paindetect2, paindetect3), ~na_if(., "NA"))) %>%
+  mutate(across(c(paindetect1, paindetect2, paindetect3), ~na_if(., "."))) %>%
+  mutate(across(c(paindetect1, paindetect2, paindetect3), as.numeric))
+
+# Sicherstellen, dass die Spalten numerisch sind
+data <- data %>%
+  mutate(across(c(paindetect1, paindetect2, paindetect3), as.numeric))
+
+# Mittelwert der Schmerzwerte berechnen (Zeilenweise)
+data <- data %>%
+  mutate(pain_avg = rowMeans(select(., paindetect1, paindetect2, paindetect3), na.rm = TRUE))
+
+# Überprüfen, ob die neue Spalte korrekt erstellt wurde
+head(data$pain_avg)
+
+
+################################Umcodierung SCI Werte
+# Sicherstellen, dass alle relevanten Spalten numerisch sind
+stress_vars <- c("sci_stress1_1", "sci_stress1_2", "sci_stress1_3", "sci_stress1_4",
+                 "sci_stress1_5", "sci_stress1_6", "sci_stress1_7", "sci_stress2_1", 
+                 "sci_stress2_2", "sci_stress2_3", "sci_stress2_4", "sci_stress2_5", 
+                 "sci_stress2_6", "sci_symtpom1", "sci_symtpom2", "sci_symtpom3", 
+                 "sci_symtpom4", "sci_symtpom5", "sci_symtpom6", "sci_symtpom7", 
+                 "sci_symtpom8", "sci_symtpom9", "sci_symtpom10", "sci_symtpom11", 
+                 "sci_symtpom12", "sci_symtpom13")
+
+data[stress_vars] <- lapply(data[stress_vars], as.numeric)
+
+data[stress_vars] <- lapply(data[stress_vars], function(x) {
+  x <- as.character(x)  # Falls es Faktoren gibt, in Zeichenketten umwandeln
+  x[x == "NA" | x == "." | x == ""] <- NA  # Ersetze problematische Werte durch NA
+  return(as.numeric(x))  # Endgültige Umwandlung in numerische Werte
+})
+
+# Umkodierungsfunktion für fälschlicherweise codierte Fragen
+umkodieren <- function(x, max_value) {
+  return ((max_value - 1) * (x - 0) / (max_value - 0) + 1)
+}
+
+# Neue Spalten mit umkodierten Werten erstellen
+for (i in 1:7) {
+  data[[paste0("sci_stress1_", i, "_new")]] <- umkodieren(data[[paste0("sci_stress1_", i)]], 7)
+}
+
+for (i in 1:6) {
+  data[[paste0("sci_stress2_", i, "_new")]] <- umkodieren(data[[paste0("sci_stress2_", i)]], 6)
+}
+
+for (i in 1:13) {
+  data[[paste0("sci_symtpom", i, "_new")]] <- umkodieren(data[[paste0("sci_symtpom", i)]], 3)
+}
+
+# Erstelle einen Vektor mit den Spaltennamen zur Berechnung der Summen
+spalten_zum_summieren <- paste0("sci_stress1_", 1:7, "_new")
+spalten_zum_summieren_2 <- paste0("sci_stress2_", 1:6, "_new")
+spalten_zum_summieren_3 <- paste0("sci_symtpom", 1:13, "_new")
+
+# Berechne die Summen der einzelnen Stressskalen für jeden Probanden
+data$stress_skala1_sum <- rowSums(data[, spalten_zum_summieren], na.rm = TRUE)
+data$stress_skala2_sum <- rowSums(data[, spalten_zum_summieren_2], na.rm = TRUE)
+data$stress_skala_symptome_sum <- rowSums(data[, spalten_zum_summieren_3], na.rm = TRUE)
+
+
+#########################Multikollinearität prüfen
+
+# Sicherstellen, dass alle Variablen numerisch sind
+data_vif <- data %>%
+  select(age, gender, ndiscore, cortisol1, cortisone1, score_pps, dms_score, dass21_depression, 
+         pain_avg, stress_skala1_sum, stress_skala2_sum, stress_skala_symptome_sum) %>%
+  mutate(across(everything(), as.numeric))
+
+# Fehlende Werte mit dem Median der jeweiligen Spalte ersetzen
+data_vif_imputed <- data_vif %>%
+  mutate(across(everything(), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
+
+# Überprüfen, ob noch NA-Werte vorhanden sind
+colSums(is.na(data_vif_imputed))
+
+# VIF-Modell mit den imputierten Daten berechnen
+vif_model <- lm( ndiscore ~ age + gender + cortisol1 + cortisone1 + score_pps + dms_score + 
+                  dass21_depression + pain_avg + stress_skala1_sum + stress_skala2_sum + 
+                  stress_skala_symptome_sum, data = data_vif_imputed)
+
+vif_values <- vif(vif_model)
+print(vif_values)
+
+
+###################Normalverteilung prüfen
+
+#nicht numerische Spalten finden
+sapply(data %>% select(age, gender, cortisol1, cortisone1, score_pps, dms_score, 
+                       dass21_depression, pain_avg, stress_skala1_sum, 
+                       stress_skala2_sum, ndiscore, stress_skala_symptome_sum), class)
+
+#Spalten mit NA-Werten bereinigen & in numeric umwandeln
+
+# Sicherstellen, dass "data" existiert
+data_vif_imputed <- data %>%
+  mutate(across(c(age, gender, ndiscore, cortisol1, cortisone1, score_pps, dms_score, 
+                  dass21_depression, pain_avg, stress_skala1_sum, 
+                  stress_skala2_sum, stress_skala_symptome_sum), 
+                ~ na_if(., "NA"))) %>%
+  mutate(across(c(age, gender, ndiscore, cortisol1, cortisone1, score_pps, dms_score, 
+                  dass21_depression, pain_avg, stress_skala1_sum, 
+                  stress_skala2_sum, stress_skala_symptome_sum), 
+                ~ na_if(., "."))) %>%
+  mutate(across(c(age, gender, ndiscore, cortisol1, cortisone1, score_pps, dms_score, 
+                  dass21_depression, pain_avg, stress_skala1_sum, 
+                  stress_skala2_sum, stress_skala_symptome_sum), 
+                ~ na_if(., ""))) %>%
+  mutate(across(c(age, gender, ndiscore, cortisol1, cortisone1, score_pps, dms_score, 
+                  dass21_depression, pain_avg, stress_skala1_sum, 
+                  stress_skala2_sum, stress_skala_symptome_sum), 
+                ~ ifelse(is.nan(.), NA, .))) %>%  # NaN in NA umwandeln
+  mutate(across(c(age, gender, ndiscore, cortisol1, cortisone1, score_pps, dms_score, 
+                  dass21_depression, pain_avg, stress_skala1_sum, 
+                  stress_skala2_sum, stress_skala_symptome_sum), 
+                as.numeric)) %>% # Jetzt in numerisch umwandeln
+  mutate(gender = factor(gender, levels = c(1, 2), labels = c("male", "female")),
+  age = as.numeric(age))
+
+sapply(data_vif_imputed %>% select(age, gender, ndiscore, cortisol1, cortisone1, score_pps, 
+                                   dms_score, dass21_depression, pain_avg, 
+                                   stress_skala1_sum, stress_skala2_sum, 
+                                   stress_skala_symptome_sum), class)
+
+
+
+
+table(data$pain_avg, useNA = "always")  # Zeigt alle eindeutigen Werte (inkl. NA)
+unique(data$pain_avg)
+
+data$pain_avg <- ifelse(is.nan(data$pain_avg), NA, data$pain_avg)
+unique(data$pain_avg)  # Es sollten keine NaN-Werte mehr angezeigt werden
+str(data$pain_avg)  # Sollte "numeric" anzeigen
+
+
+data_vif_imputed$study_id <- data$study_id
+
+#########################Voraussetzungen prüfen#################
+# Modell mit den imputierten Daten berechnen
+lmm_model <- lmer(ndiscore ~ age + gender + dass21_depression + cortisol1 + score_pps +
+                    dass21_depression + pain_avg + stress_skala1_sum + stress_skala2_sum + 
+                    stress_skala_symptome_sum + (1 | study_id), 
+                  data = data_vif_imputed, REML = FALSE)
+
+sum(complete.cases(data_vif_imputed))
+colSums(is.na(data_vif_imputed))
+
+
+cor_matrix <- cor(data_vif_imputed %>% select(age, gender, cortisol1, score_pps,
+                                              dass21_depression, pain_avg, stress_skala1_sum, 
+                                              stress_skala2_sum, stress_skala_symptome_sum), 
+                  use = "complete.obs")
+
+print(cor_matrix)
+
+
+#Multikollinearität überprüfen (VIF-Werte berechnen) NDI:
+
+vif_model <- lm(ndiscore ~ age + gender + dass21_depression + cortisol1 + score_pps + 
+                  dass21_depression + pain_avg + stress_skala1_sum + stress_skala2_sum + 
+                  stress_skala_symptome_sum, data = data_vif_imputed)
+vif(vif_model)
+
+#Visualisierung der Multikollinearität 
+
+ggpairs(data_vif_imputed %>% select(stress_skala1_sum, stress_skala2_sum, stress_skala_symptome_sum))
+
+
+#ohne Stressskala 2 nochmals berechnen
+
+# Stress Skala 2 entfernen
+
+data_vif_imputed <- data_vif_imputed %>%
+  select(-stress_skala2_sum)
+
+data_vif_imputed$study_id <- data$study_id
+
+# Neues lineares Modell prüfen ohne stress_skala2_sum für NDI
+lmm_model <- lmer(ndiscore ~ age + gender + dass21_depression + cortisol1 + score_pps + 
+                    dass21_depression + pain_avg + stress_skala1_sum + 
+                    stress_skala_symptome_sum + (1 | study_id), 
+                  data = data_vif_imputed, REML = FALSE)
+
+# VIF-Werte berechnen
+vif_values <- vif(vif_model)
+
+# Ergebnisse ausgeben
+print(vif_values)
+
+#Visualisierung der Multikollinearität 
+
+ggpairs(data_vif_imputed %>% select(stress_skala1_sum, stress_skala_symptome_sum))
+
+#Modell prüfen
+
+print(lmm_model)
+check_model(lmm_model, check = c("linearity", "normality", "homogeneity", "outliers"))
+check_collinearity(lmm_model)
+performance::check_predictions(lmm_model)
+
+#Neues lineares Modell prüfen ohne stress_skala2_sum für Pain
+lmm_pain <- lmer(
+  pain_avg ~ age + gender +  cortisol1 + score_pps +
+    dass21_depression + stress_skala1_sum + stress_skala_symptome_sum + 
+    (1 | study_id),
+  data = data_vif_imputed
+)
+
+vif_model_pain <- lm(
+  pain_avg ~ age + gender +  cortisol1 + score_pps + 
+    dass21_depression + stress_skala1_sum + stress_skala_symptome_sum,
+  data = data_vif_imputed
+)
+
+
+vif_values_pain <- vif(vif_model_pain)
+print(vif_values_pain)
+
+
+check_model(lmm_pain)
+check_model(lmm_pain, check = c("linearity", "normality", "homogeneity", "outliers"))
+check_collinearity(lmm_pain)
+performance::check_predictions(lmm_pain)
+
+#Schritt 1: Modellformulierung
+# A) Für ndiscore
+lmm_ndi <- lmer(
+  ndiscore ~ age + gender +  cortisol1  + score_pps +  
+    dass21_depression + pain_avg + stress_skala1_sum + 
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_vif_imputed
+)
+# B) Für pain_avg
+lmm_pain <- lmer(
+  pain_avg ~ age + gender + cortisol1 + score_pps + 
+    dass21_depression + stress_skala1_sum + 
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_vif_imputed
+)
+
+#Schritt 2: Modelldiagnostik
+#2A – Grafische Checks:
+check_model(lmm_ndi)
+check_model(lmm_pain)
+
+#2B – VIF prüfen:
+vif_model_ndi <- lm(
+  ndiscore ~ age + gender +  cortisol1 + score_pps +  
+    dass21_depression + pain_avg + stress_skala1_sum + 
+    stress_skala_symptome_sum,
+  data = data_vif_imputed
+)
+
+vif_model_pain <- lm(
+  pain_avg ~ age + gender + cortisol1 + score_pps + 
+    dass21_depression + stress_skala1_sum + stress_skala_symptome_sum,
+  data = data_vif_imputed
+)
+
+vif(vif_model_ndi)
+vif(vif_model_pain)
+
+
+
+###############################Verteilung der outcomes prüfen
+# 1A: Verteilung NDI anzeigen
+table(data$ndiscore)
+barplot(table(data$ndiscore))
+
+# 1B: Wieviele einzigartige Werte?
+length(unique(data$ndiscore))
+
+# 2A: Verteilung pain intensity anzeigen
+table(data$pain_avg)
+barplot(table(data$pain_avg))
+
+# 2B: Wieviele einzigartige Werte?
+length(unique(data$pain_avg))
+
+
+###########################logistische Regression für NDI gewählt aufgrund ordinaler Werte der outcomes
+table(data$ndiscore)
+# Auf ganze Zahlen runden
+data_vif_imputed$ndiscore_clean <- round(as.numeric(data_vif_imputed$ndiscore))
+
+# In einen geordneten Faktor umwandeln
+data_vif_imputed$ndiscore_factor <- factor(data_vif_imputed$ndiscore_clean, ordered = TRUE)
+table(data_vif_imputed$ndiscore_clean)
+#Rundung auf Ganzzahlen
+data_vif_imputed$ndiscore_clean <- round(as.numeric(data_vif_imputed$ndiscore))
+data_vif_imputed$ndiscore_factor <- factor(data_vif_imputed$ndiscore_clean, ordered = TRUE)
+table(data_vif_imputed$ndiscore_factor)
+str(data_vif_imputed$ndiscore_factor)
+
+# Bayesian Modelle
+brm_ndi <- brm(ndiscore_factor ~ age + gender + cortisol1 + 
+               score_pps + dass21_depression + 
+               pain_avg + stress_skala1_sum + 
+               stress_skala_symptome_sum + (1 | study_id),
+              data = data_vif_imputed,
+              family = cumulative(link = "logit"),  # Ordinal-Modell
+              chains = 2, iter = 2000, cores = 2)
+
+
+brm_pain <- brm(pain_avg ~ age + gender + cortisol1 + 
+                  score_pps + dass21_depression + 
+                  stress_skala1_sum + stress_skala_symptome_sum + 
+                  (1 | study_id),
+                data = data_vif_imputed,
+                chains = 2, iter = 2000, cores = 2)
+
+tab_model(lmm_ndi, brm_ndi,
+          show.re.var = TRUE, 
+          title = "Vergleich NDI: LMM vs. Bayesian")
+
+tab_model(lmm_pain, brm_pain,
+          show.re.var = TRUE, 
+          title = "Vergleich Schmerz: LMM vs. Bayesian")
+
+
+r2(lmm_ndi)
+r2(lmm_pain)
+
+bayes_R2(brm_ndi)
+bayes_R2(brm_pain)
+
+
+######################ANderes Modell wählen für NDI?
+#zero inflated model
+
+table(data$ndiscore)
+
+brm_ndi_zi <- brm(
+  ndiscore_clean ~ age + gender + cortisol1 + cortisone1 + score_pps + 
+    dms_score + dass21_depression + pain_avg + stress_skala1_sum + 
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_vif_imputed,
+  family = zero_inflated_poisson(),  # alternativ auch: zero_inflated_negbinomial()
+  chains = 2, iter = 2000, cores = 2
+)
+saveRDS(brm_ndi_zi, "brm_ndi_zi.rds")
+
+#output zero inflated ansehen:
+summary(brm_ndi_zi)
+pp_check(brm_ndi_zi)
+
+#############################
+#zweistufiges Modell:
+data_vif_imputed <- data_vif_imputed %>%
+  mutate(ndi_bin = ifelse(ndiscore <= 4, 0, 1))
+table(data_vif_imputed$ndi_bin)
+
+# Binäres Modell
+brm_ndi_step1 <- brm(
+  ndi_bin ~ age + gender + cortisol1 + cortisone1 + score_pps +
+    dms_score + dass21_depression + pain_avg + stress_skala1_sum +
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_vif_imputed,
+  family = bernoulli(link = "logit"),
+  chains = 2, iter = 2000, cores = 2
+)
+data_step2 <- data_vif_imputed %>% filter(ndi_bin == 1)
+
+# Optional: ndiscore als Faktor, ordinales Modell 
+data_step2 <- data_step2 %>%
+  mutate(ndiscore_factor = factor(ndiscore, ordered = TRUE))
+
+# Schritt 2: Modell bei Einschränkungs-Gruppe
+brm_ndi_step2 <- brm(
+  ndiscore_factor ~ age + gender + cortisol1 + cortisone1 + score_pps +
+    dms_score + dass21_depression + pain_avg + stress_skala1_sum +
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_step2,
+  family = cumulative(link = "logit"),
+  chains = 2, iter = 2000, cores = 2
+)
+
+# Modell ist sehr komplex oder schwer zu schätzen, Anpassungen:
+data_step2 <- data_vif_imputed %>%
+  filter(ndiscore > 0)
+data_step2$ndiscore_factor <- factor(
+  data_step2$ndiscore, 
+  ordered = TRUE
+)
+
+brm_ndi_step2 <- brm(
+  ndiscore_factor ~ age + gender + cortisol1 + cortisone1 + score_pps +
+    dms_score + dass21_depression + pain_avg + stress_skala1_sum +
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_step2,
+  family = cumulative(link = "logit"),
+  chains = 4,
+  iter = 4000,
+  warmup = 1000,
+  cores = 2,
+  control = list(adapt_delta = 0.95, max_treedepth = 15)
+)
+###output NDI ansehen:
+# Zusammenfassung des Modells
+summary(brm_ndi_step2)
+# Posterior Predictive Check
+pp_check(brm_ndi_step2)
+# Tabellenoutput
+tab_model(brm_ndi_step2)
+#fixed effects:
+fixef(brm_ndi_step2)
+plot(brm_ndi_step2)
+# R2 ausgeben (Bayesian R2)
+r2(brm_ndi_step2)
+
+
+####################Modell für pain prüfen:
+
+# Prüfen, ob alle Variablen numerisch oder korrekt faktorisiert sind
+str(data_vif_imputed$gender)  # sollte Faktor sein
+str(data_vif_imputed$pain_avg)  # sollte numeric sein
+
+# Falls nötig:
+data_vif_imputed$gender <- factor(data_vif_imputed$gender, levels = c(1, 2), labels = c("male", "female"))
+
+# Modellformulierung
+brm_pain <- brm(
+  pain_avg ~ age + gender + cortisol1 + cortisone1 + score_pps + 
+    dms_score + dass21_depression + stress_skala1_sum + 
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_vif_imputed,
+  family = gaussian(),  # da kontinuierlich
+  chains = 2, iter = 2000, cores = 2
+)
+
+###output pain ansehen:
+# Zusammenfassung des Modells
+summary(brm_pain)
+# Posterior Predictive Check
+pp_check(brm_pain)
+# Tabellenoutput für beide Modelle (NDI und Pain)
+tab_model(brm_step2, brm_pain, show.re.var = TRUE)
+# R2 ausgeben (Bayesian R2)
+r2(brm_pain)
+#fixed effects:
+fixef(brm_pain)
+plot(brm_pain)
+
+
+##############################Modell schätzt Pain noch nicht gut
+##zweistufiges Modell:
+# Schritt 1: Binäre Variable erstellen
+data_vif_imputed$pain_step1 <- ifelse(data_vif_imputed$pain_avg >= 3, 1, 0)
+
+# Kontrolle:
+table(data_vif_imputed$pain_step1)
+
+# Schritt 1: Logistisches Modell
+brm_pain_step1 <- brm(
+  pain_step1 ~ age + gender + cortisol1 + cortisone1 + score_pps +
+    dms_score + dass21_depression + stress_skala1_sum +
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_vif_imputed,
+  family = bernoulli(),  # Binäres Modell
+  chains = 2, iter = 2000, cores = 2
+)
+
+# Schritt 2: Filtere nur Fälle mit pain_avg >= 3
+data_pain_step2 <- data_vif_imputed %>%
+  filter(pain_avg >= 3)
+
+# Schritt 2: Regressionsmodell für Schmerzintensität
+brm_pain_step2 <- brm(
+  pain_avg ~ age + gender + cortisol1 + cortisone1 + score_pps +
+    dms_score + dass21_depression + stress_skala1_sum +
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_pain_step2,
+  family = student(),  # Robuster als Gaussian bei Ausreißern
+  chains = 2, iter = 2000, cores = 2
+)
+
+###output pain ansehen:
+# Zusammenfassung
+summary(brm_pain_step1)
+summary(brm_pain_step2)
+
+# Posterior Predictive Checks
+pp_check(brm_pain_step1)
+pp_check(brm_pain_step2)
+
+# R2 ausgeben (Bayesian R2)
+r2(brm_pain_step1)
+r2(brm_pain_step2)
+
+#fixed effects:
+fixef(brm_pain_step1)
+fixef(brm_pain_step2)
+
+# Plot-Modell
+plot(brm_pain_step1)
+plot(brm_pain_step2)
+
+
+#Ergebnisse extrahieren:
+tab_model(brm_pain_step1, brm_pain_step2)
+plot_model(brm_pain_step1, type = "pred")
+
+#############################neues Modell, einmal <3 und einmal >3
+data_pain_low <- data_vif_imputed %>% filter(pain_avg <= 3)
+data_pain_high <- data_vif_imputed %>% filter(pain_avg > 3)
+
+
+brm_pain_low <- brm(
+  pain_avg ~ age + gender + cortisol1 + cortisone1 + score_pps +
+    dms_score + dass21_depression + stress_skala1_sum +
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_pain_low,
+  family = gaussian(),  # oder student() falls Ausreißer
+  chains = 2, iter = 2000, cores = 2
+)
+
+
+brm_pain_high <- brm(
+  pain_avg ~ age + gender + cortisol1 + cortisone1 + score_pps +
+    dms_score + dass21_depression + stress_skala1_sum +
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_pain_high,
+  family = student(),  # robuster bei Ausreißern
+  chains = 2, iter = 2000, cores = 2
+)
+
+pp_check(brm_pain_low)
+pp_check(brm_pain_high)
+
+###############schätzt die hohen Werte nicht gut, darum ordinales Modell
+
+# pain_avg aufgerundet zu geordnetem Faktor
+data_pain_high$pain_avg_ord <- factor(round(data_pain_high$pain_avg), 
+                                      ordered = TRUE)
+
+brm_pain_high_ord <- brm(
+  pain_avg_ord ~ age + gender + cortisol1 + cortisone1 + score_pps +
+    dms_score + dass21_depression + stress_skala1_sum +
+    stress_skala_symptome_sum + (1 | study_id),
+  data = data_pain_high,
+  family = cumulative("logit"),
+  chains = 2, iter = 2000, cores = 2
+)
+
+###output ansehen:
+# Zusammenfassung
+summary(brm_pain_high_ord)
+
+# Posterior Predictive Checks
+pp_check(brm_pain_high_ord)
+
+# R2 ausgeben (Bayesian R2)
+r2(brm_pain_high_ord)
+
+#fixed effects:
+fixef(brm_pain_high_ord)
+
+# Plot-Modell
+plot(brm_pain_high_ord)
