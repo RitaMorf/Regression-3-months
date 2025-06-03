@@ -228,6 +228,34 @@ data_stress_sums <- data %>%
   filter(redcap_event_name == "fragebogen_t1_arm_1") %>%
   select(study_id, stress_skala1_sum, stress_skala2_sum, stress_skala_symptome_sum)
 
+
+################Pearson Korrelation zw. subj. & obj. Stressmessung:
+# 1. Relevante Variablen auswählen und zusammenführen
+data_stress_objektiv <- data %>%
+  filter(redcap_event_name == "untersuchung_t1_arm_1") %>%
+  select(study_id, cortisol1) %>%
+  mutate(cortisol1 = as.numeric(cortisol1))  # sicherstellen, dass numerisch
+
+# 2. Subjektive + objektive Daten zusammenführen
+data_stress_merged <- data_stress_sums %>%
+  left_join(data_stress_objektiv, by = "study_id")
+
+# 3. NA-Fälle entfernen (nur vollständige Daten verwenden)
+data_stress_complete <- data_stress_merged %>%
+  filter(!is.na(cortisol1),
+         !is.na(stress_skala1_sum),
+         !is.na(stress_skala2_sum),
+         !is.na(stress_skala_symptome_sum))
+
+# 4. Pearson-Korrelation berechnen
+cor.test(data_stress_complete$cortisol1, data_stress_complete$stress_skala1_sum, method = "pearson")
+cor.test(data_stress_complete$cortisol1, data_stress_complete$stress_skala2_sum, method = "pearson")
+cor.test(data_stress_complete$cortisol1, data_stress_complete$stress_skala_symptome_sum, method = "pearson")
+
+#Summe rausgeben
+sum(complete.cases(data$stress_skala1_sum, data$cortisol1))
+
+
 #########################Multikollinearität prüfen
 
 # Vor dem Berechnen numerische Umwandlung sicherstellen
@@ -787,14 +815,6 @@ mcmc_areas(posterior,
            prob = 0.95) +
   ggtitle("Posterior distribution of the regression coefficients (Disability)")
 
-
-
-# Plot Fixeffekte mit Konfidenzintervallen
-plot_model(brm_ndi_zi, 
-           type = "est", 
-           show.values = TRUE, 
-           value.offset = 0.3,
-           title = "Fixed effects for Disability")
 
 
 # Geordnete Darstellung der Regressionskoeffizienten
